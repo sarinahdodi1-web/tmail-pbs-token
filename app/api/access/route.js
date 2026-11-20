@@ -22,7 +22,12 @@ export async function POST(request) {
     checkAccessRateLimit(ip);
     const body = await request.json().catch(() => ({}));
     const session = await createAccessSession(body?.token);
-    const response = NextResponse.json({ alias: session.alias, expiresAt: session.expiresAt });
+    const response = NextResponse.json({
+      tokenId: session.tokenId,
+      alias: session.alias,
+      status: session.status,
+      expiresAt: session.expiresAt
+    });
     response.cookies.set({ ...getAccessCookieOptions(), value: session.cookieValue });
     return noStore(response);
   } catch (err) {

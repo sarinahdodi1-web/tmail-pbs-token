@@ -1,5 +1,23 @@
 # Project Update Summary
 
+## Multi-Token FIFO (2026-11-20)
+
+- Satu alias dapat memiliki banyak token akses yang dikelola dari panel admin.
+- Pembuatan alias otomatis membuat token awal; admin dapat membuat token tambahan dan menyalin kembali nilai token terenkripsi.
+- Setiap token hanya dapat ditukar sekali. Pertukaran mengubah status menjadi `waiting`, sedangkan cookie sesi HttpOnly tetap berlaku setelah pertukaran.
+- Email dialokasikan ke token `waiting` paling lama dengan urutan FIFO, tepat satu pesan per token, lalu status menjadi `fulfilled`.
+- Token `available` dan `waiting` dapat dicabut; token `fulfilled` tidak dapat dicabut.
+- Email yang tiba tanpa token `waiting` tidak dialokasikan ke sesi publik.
+- Deployment Supabase harus menjalankan `supabase/migrations/20261120_0004_multi_tokens_fifo.sql`.
+- `ACCESS_SESSION_SECRET` harus random, panjang, dan stabil; penggantian secret membatalkan sesi akses aktif.
+
+### Endpoint Admin Token
+
+- `GET /api/admin/aliases/:address/tokens` membaca token dan metadata status.
+- `POST /api/admin/aliases/:address/tokens` membuat token tambahan.
+- `DELETE /api/admin/aliases/:address/tokens/:id` mencabut token yang masih `available` atau `waiting`.
+- Tidak ada endpoint rotasi token. Buat token baru dan cabut token lama bila diperlukan.
+
 ## Perubahan yang telah dilakukan
 
 ### 1. Backend Security Hardening (`gmail-backend/index.js`)

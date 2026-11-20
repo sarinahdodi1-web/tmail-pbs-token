@@ -5,7 +5,7 @@ export default function AdminOverviewSection({
   logCount,
   stats
 }) {
-  const protectedAliases = aliasRows.filter((row) => Boolean(row.hasAccessToken)).length;
+  const totalTokens = aliasRows.reduce((sum, row) => sum + Number(row.tokenCount || 0), 0);
 
   return (
     <div className="admin-overview">
@@ -38,8 +38,8 @@ export default function AdminOverviewSection({
           </article>
           <article className="admin-kpi-card">
             <div className="admin-kpi-icon bg-info-subtle text-info"><i className="bi bi-shield-lock" /></div>
-            <p className="admin-kpi-label">Alias Dengan Token</p>
-            <h3 className="admin-kpi-value">{protectedAliases}</h3>
+            <p className="admin-kpi-label">Total Token</p>
+            <h3 className="admin-kpi-value">{totalTokens}</h3>
           </article>
         </div>
       )}

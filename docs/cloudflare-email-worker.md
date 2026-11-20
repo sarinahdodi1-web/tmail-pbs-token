@@ -29,7 +29,7 @@ opsional:
 - Cloudflare Email Routing aktif.
 - Aplikasi Next.js sudah deploy dengan HTTPS publik.
 - Supabase service role tersedia di server app.
-- Migration `20261120_0001_initial_schema.sql` sudah dijalankan.
+- Migration hingga `20261120_0004_multi_tokens_fifo.sql` sudah dijalankan.
 
 ## Environment Aplikasi
 
@@ -38,13 +38,22 @@ Tambahkan env ini di aplikasi Next.js:
 ```env
 CLOUDFLARE_EMAIL_WEBHOOK_SECRET=isi-secret-panjang-random
 SUPABASE_TABLE_MESSAGES=app_messages
+ACCESS_SESSION_SECRET=isi-secret-lain-minimal-32-karakter
 ```
 
 `CLOUDFLARE_EMAIL_WEBHOOK_SECRET` harus sama dengan secret `WEBHOOK_SECRET` di Worker.
 
+`ACCESS_SESSION_SECRET` harus panjang, random, dan tetap sama pada setiap deployment/instance. Perubahan secret membatalkan cookie sesi akses yang sudah diterbitkan.
+
 ## Migration Supabase
 
-Jalankan migration terbaru:
+Untuk instalasi yang sudah ada, jalankan migration terbaru:
+
+```text
+supabase/migrations/20261120_0004_multi_tokens_fifo.sql
+```
+
+Migration ini menambahkan penyimpanan multi-token terenkripsi dan fungsi alokasi email FIFO. Skema pesan dasarnya berasal dari baseline:
 
 ```sql
 -- Bagian app_messages dari supabase/migrations/20261120_0001_initial_schema.sql
@@ -182,7 +191,9 @@ GET /api/admin/messages/:id
 
 Jika `app_messages` belum tersedia, aplikasi masih fallback ke Gmail API. Jika tabel sudah tersedia tetapi alias belum punya email, API mengembalikan inbox kosong tanpa memanggil Gmail.
 
-Semua email untuk domain aktif disimpan ke `app_messages`. Jika `BACKUP_EMAIL` Worker diisi, salinan email juga dapat diteruskan ke Gmail.
+Setiap alias dapat memiliki beberapa token. Token hanya dapat ditukar satu kali, lalu berubah menjadi `waiting`. Email dialokasikan ke token `waiting` paling lama (FIFO), tepat satu pesan untuk setiap token, lalu token menjadi `fulfilled`. Endpoint publik mengembalikan daftar kosong selama menunggu dan hanya pesan yang dialokasikan setelah terpenuhi. Pesan yang masuk ketika tidak ada token `waiting` tidak dialokasikan dan diabaikan oleh inbox akses publik.
+
+Jika `BACKUP_EMAIL` Worker diisi, salinan email juga dapat diteruskan ke Gmail.
 
 Endpoint publik memerlukan cookie sesi HttpOnly dari `POST /api/access`. Alias ditentukan oleh sesi, bukan query string. Token akses tidak dikirim ke endpoint pesan atau SSE.
 

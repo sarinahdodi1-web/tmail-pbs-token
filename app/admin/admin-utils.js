@@ -31,6 +31,7 @@ export function localizeErrorMessage(message) {
   if (lowered.includes('unauthorized')) return 'Sesi admin tidak valid. Silakan login ulang.';
   if (lowered.includes('forbidden')) return 'Akses ditolak untuk aksi ini.';
   if (lowered.includes('domain not allowed')) return 'Domain belum diizinkan.';
+  if (lowered.includes('fulfilled tokens cannot be revoked')) return 'Token yang sudah terpenuhi tidak dapat dicabut.';
   if (lowered.includes('invalid')) return 'Data tidak valid. Periksa kembali input Anda.';
   if (lowered.includes('failed to load')) return 'Gagal memuat data. Coba lagi beberapa saat.';
   if (lowered.includes('request failed')) return 'Permintaan gagal diproses oleh server.';
@@ -38,7 +39,7 @@ export function localizeErrorMessage(message) {
 }
 
 export function hasAliasConfig(row) {
-  return Boolean(row?.hasAccessToken);
+  return Number(row?.tokenCount || 0) > 0;
 }
 
 export function paginateRows(rows, page, pageSize) {

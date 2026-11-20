@@ -46,7 +46,7 @@ export async function GET(request) {
       // Subscribe to new mail notifications
       const listener = (payload) => {
         if (closed) return;
-        if (payload?.alias !== session.alias) return;
+        if (payload?.tokenId !== session.tokenId) return;
         try {
           controller.enqueue(
             encoder.encode(`event: newmail\ndata: ${JSON.stringify(payload || {})}\n\n`)

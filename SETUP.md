@@ -35,10 +35,13 @@ Buat user admin di:
 Supabase Dashboard -> Authentication -> Users -> Add user
 ```
 
-Jalankan migration baseline untuk membuat seluruh tabel aplikasi:
+Jalankan migration secara berurutan. Instalasi yang sudah memakai baseline lama tetap wajib menjalankan migration multi-token terbaru:
 
 ```text
 supabase/migrations/20261120_0001_initial_schema.sql
+supabase/migrations/20261120_0002_grant_service_role.sql
+supabase/migrations/20261120_0003_alias_access_tokens.sql
+supabase/migrations/20261120_0004_multi_tokens_fifo.sql
 ```
 
 Jika memakai SQL Editor, jalankan seluruh isi file migration tersebut. Jangan hanya membuat tabel `app_messages` karena aplikasi juga membutuhkan tabel alias, domain, log, audit, dan konfigurasi.
@@ -78,6 +81,7 @@ SUPABASE_TABLE_MESSAGES=app_messages
 SUPABASE_TABLE_AUDIT=app_audit
 
 CLOUDFLARE_EMAIL_WEBHOOK_SECRET=isi-secret-panjang-random
+ACCESS_SESSION_SECRET=isi-secret-lain-minimal-32-karakter
 
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -91,6 +95,8 @@ TOKEN_ENCRYPTION_KEY=
 ```
 
 `CLOUDFLARE_EMAIL_WEBHOOK_SECRET` harus sama persis dengan `WEBHOOK_SECRET` di Cloudflare Worker.
+
+`ACCESS_SESSION_SECRET` menandatangani cookie sesi akses publik. Gunakan nilai random yang panjang dan stabil di seluruh instance/deployment. Mengganti nilai ini akan membatalkan semua sesi token yang sedang menunggu atau sudah menerima email.
 
 Google env bersifat opsional. Kosongkan jika Worker menjadi inbox utama dan Gmail API tidak dipakai.
 
@@ -266,7 +272,9 @@ Yang ditambahkan adalah domain email alias, bukan domain aplikasi Vercel.
 
 ## 11. Buat Alias dan Test End-To-End
 
-Buat alias dari menu Alias di dashboard admin. Token akses dibuat otomatis oleh server dan hanya ditampilkan sekali; simpan token tersebut sebelum meninggalkan halaman.
+Buat alias dari menu Alias di dashboard admin. Server otomatis membuat token awal. Token dapat dibuka dan disalin kembali melalui aksi **Kelola token**, dan admin dapat membuat beberapa token untuk alias yang sama.
+
+Setiap token hanya dapat ditukar satu kali. Setelah ditukar, token masuk antrean `waiting`; email berikutnya dialokasikan ke token menunggu paling lama (FIFO). Tepat satu email dialokasikan ke setiap token. Email yang datang saat tidak ada token `waiting` diabaikan oleh inbox akses publik.
 
 Kirim email ke alias yang baru dibuat:
 
@@ -316,7 +324,7 @@ Email juga masuk Gmail jika `BACKUP_EMAIL` diisi.
 | `App webhook returned 400` | Domain alias belum aktif atau recipient invalid | Tambahkan domain email di admin TMail |
 | `App webhook returned 500` | Error Supabase/schema/server | Cek response log, migration, dan Vercel logs |
 | Email tidak masuk Gmail | `BACKUP_EMAIL` kosong, destination belum verified, atau forward gagal | Verifikasi destination Gmail di Cloudflare, cek Spam/Promotions Gmail, lalu lihat Worker log forwarding |
-| Token ditolak | Token salah, sudah dirotasi, atau alias diarsipkan | Buat/rotasi token dari admin dan gunakan token terbaru |
+| Token ditolak | Token salah, sudah pernah ditukar, sudah dicabut, atau alias diarsipkan | Buat token baru dari menu Kelola token dan gunakan satu kali |
 | TMail kosong tapi `app_messages` ada isi | Alias sesi berbeda dengan kolom `alias` | Pastikan token dibuat untuk alias tujuan email |
 
 ## 13. Catatan Produksi
@@ -324,6 +332,8 @@ Email juga masuk Gmail jika `BACKUP_EMAIL` diisi.
 Gunakan secret panjang random minimal 32 karakter.
 
 Jangan memasukkan token akses ke URL, log, atau local storage. Akses publik memakai cookie sesi HttpOnly.
+
+Jangan merotasi `ACCESS_SESSION_SECRET` saat masih ada sesi aktif kecuali memang ingin membatalkan seluruh sesi tersebut.
 
 Jangan commit `.env`, `.env.old`, `.next`, atau `node_modules`.
 

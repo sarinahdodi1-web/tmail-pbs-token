@@ -8,6 +8,7 @@ import AdminMessageModal from './AdminMessageModal';
 import AdminAppearanceSection from './components/AdminAppearanceSection';
 import AdminAliasCreateForm from './components/AdminAliasCreateForm';
 import AdminDomainsSection from './components/AdminDomainsSection';
+import AdminTokenManager from './components/AdminTokenManager';
 import {
   ADMIN_THEMES,
   ADMIN_THEME_MAP,
@@ -54,6 +55,7 @@ export default function AdminPage() {
   const [logPage, setLogPage] = useState(1);
   const [aliasFormAddress, setAliasFormAddress] = useState('');
   const [revealedToken, setRevealedToken] = useState(null);
+  const [tokenManagerAlias, setTokenManagerAlias] = useState('');
   const [aliasListTab, setAliasListTab] = useState('all');
   const [inboxAlias, setInboxAlias] = useState('');
   const [inboxMessages, setInboxMessages] = useState([]);
@@ -217,9 +219,10 @@ export default function AdminPage() {
         lastUsedAt: a.lastUsedAt || null,
         hits: a.hits || 0,
         active: a.active !== false,
-        hasAccessToken: Boolean(a.hasAccessToken),
-        tokenLast4: a.tokenLast4 || null,
-        tokenCreatedAt: a.tokenCreatedAt || null,
+        tokenCount: Number(a.tokenCount || 0),
+        availableTokenCount: Number(a.availableTokenCount || 0),
+        waitingTokenCount: Number(a.waitingTokenCount || 0),
+        fulfilledTokenCount: Number(a.fulfilledTokenCount || 0),
         totalEmails: activity?.totalEmails || 0,
         latestSeenAt: activity?.latestSeenAt || null,
         latestSubject: activity?.latestSubject || '-',
@@ -236,9 +239,10 @@ export default function AdminPage() {
         lastUsedAt: null,
         hits: 0,
         active: true,
-        hasAccessToken: false,
-        tokenLast4: null,
-        tokenCreatedAt: null,
+        tokenCount: 0,
+        availableTokenCount: 0,
+        waitingTokenCount: 0,
+        fulfilledTokenCount: 0,
         totalEmails: value.totalEmails || 0,
         latestSeenAt: value.latestSeenAt || null,
         latestSubject: value.latestSubject || '-',
@@ -272,8 +276,10 @@ export default function AdminPage() {
 
   const aliasPageSize = 25;
   const aliasTabRows = useMemo(() => {
-    if (aliasListTab === 'configured') return aliasRows.filter((row) => hasAliasConfig(row));
-    if (aliasListTab === 'plain') return aliasRows.filter((row) => !hasAliasConfig(row));
+    if (aliasListTab === 'available') return aliasRows.filter((row) => row.availableTokenCount > 0);
+    if (aliasListTab === 'waiting') return aliasRows.filter((row) => row.waitingTokenCount > 0);
+    if (aliasListTab === 'fulfilled') return aliasRows.filter((row) => row.fulfilledTokenCount > 0);
+    if (aliasListTab === 'none') return aliasRows.filter((row) => !hasAliasConfig(row));
     return aliasRows;
   }, [aliasListTab, aliasRows]);
   const aliasPagination = useMemo(
@@ -441,17 +447,21 @@ export default function AdminPage() {
     setAliasFormAddress(rand + (domain ? '@' + domain : ''));
   }
 
-  async function rotateAliasToken(address) {
-    if (!window.confirm(`Rotasi token untuk ${address}? Token lama akan langsung tidak berlaku.`)) return;
-    try {
-      const data = await fetchWithAdmin(`/api/admin/aliases/${encodeURIComponent(address)}/rotate-token`, { method: 'POST' });
-      setRevealedToken({ address, token: data.accessToken });
-      await loadAll();
-      setToast('Token akses berhasil dirotasi');
-    } catch (err) {
-      setToast(localizeErrorMessage(err?.message) || 'Gagal merotasi token');
-    }
-  }
+  const loadAliasTokens = useCallback((address) => (
+    fetchWithAdmin(`/api/admin/aliases/${encodeURIComponent(address)}/tokens`)
+  ), [fetchWithAdmin]);
+
+  const createAliasToken = useCallback(async (address) => {
+    const data = await fetchWithAdmin(`/api/admin/aliases/${encodeURIComponent(address)}/tokens`, { method: 'POST' });
+    await loadAll();
+    return data;
+  }, [fetchWithAdmin, loadAll]);
+
+  const revokeAliasToken = useCallback(async (address, tokenId) => {
+    const data = await fetchWithAdmin(`/api/admin/aliases/${encodeURIComponent(address)}/tokens/${encodeURIComponent(tokenId)}`, { method: 'DELETE' });
+    await loadAll();
+    return data;
+  }, [fetchWithAdmin, loadAll]);
 
   async function copyAccessToken() {
     if (!revealedToken?.token) return;
@@ -824,7 +834,7 @@ export default function AdminPage() {
                   { label: 'Total Alias', value: stats?.totalAliases ?? aliasRows.length, icon: 'bi-at', tone: 'primary' },
                   { label: 'Domain Aktif', value: activeDomains.length, icon: 'bi-globe2', tone: 'warning' },
                   { label: 'Email Tercatat', value: logs.length, icon: 'bi-envelope-check', tone: 'success' },
-                  { label: 'Alias With Token', value: aliasRows.filter((row) => hasAliasConfig(row)).length, icon: 'bi-key-fill', tone: 'info' },
+                  { label: 'Total Token', value: aliasRows.reduce((sum, row) => sum + row.tokenCount, 0), icon: 'bi-key-fill', tone: 'info' },
                 ].map((item) => (
                   <article className="admin-kpi-card" key={item.label}>
                     <div className={`admin-kpi-icon bg-${item.tone}-subtle text-${item.tone}`}><i className={`bi ${item.icon}`} /></div>
@@ -852,8 +862,8 @@ export default function AdminPage() {
               <div className="admin-panel border border-warning token-reveal-card" role="alert">
                 <div className="d-flex align-items-start justify-content-between gap-3 flex-wrap">
                   <div className="min-width-0">
-                    <div className="text-warning fw-bold mb-1"><i className="bi bi-exclamation-triangle-fill me-2" />Simpan token ini sekarang</div>
-                    <p className="small text-muted mb-3">Token untuk <strong>{revealedToken.address}</strong> hanya ditampilkan sekali dan tidak dapat dilihat kembali.</p>
+                    <div className="text-warning fw-bold mb-1"><i className="bi bi-key-fill me-2" />Token awal siap digunakan</div>
+                    <p className="small text-muted mb-3">Token untuk <strong>{revealedToken.address}</strong> tetap dapat dilihat dan disalin kembali melalui menu Kelola token.</p>
                     <code className="token-reveal-value">{revealedToken.token}</code>
                   </div>
                   <button type="button" className="btn btn-warning" onClick={copyAccessToken}><i className="bi bi-copy me-2" />Salin token</button>
@@ -893,8 +903,10 @@ export default function AdminPage() {
                 <div className="d-flex" style={{ gap: '0' }}>
                   {[
                     { key: 'all', label: 'Semua', icon: 'bi-collection', count: aliasRows.length },
-                    { key: 'configured', label: 'With Token', icon: 'bi-key-fill', count: aliasRows.filter((r) => hasAliasConfig(r)).length },
-                    { key: 'plain', label: 'Without Token', icon: 'bi-envelope', count: aliasRows.filter((r) => !hasAliasConfig(r)).length },
+                    { key: 'available', label: 'Token Tersedia', icon: 'bi-key-fill', count: aliasRows.filter((r) => r.availableTokenCount > 0).length },
+                    { key: 'waiting', label: 'Menunggu', icon: 'bi-hourglass-split', count: aliasRows.filter((r) => r.waitingTokenCount > 0).length },
+                    { key: 'fulfilled', label: 'Terpenuhi', icon: 'bi-check-circle-fill', count: aliasRows.filter((r) => r.fulfilledTokenCount > 0).length },
+                    { key: 'none', label: 'Tanpa Token', icon: 'bi-key', count: aliasRows.filter((r) => !hasAliasConfig(r)).length },
                   ].map((tab) => (
                     <button
                       key={tab.key}
@@ -957,19 +969,17 @@ export default function AdminPage() {
                             <td className="text-nowrap d-none d-lg-table-cell">{formatCompactDate(row.createdAt)}</td>
                             <td className="text-end fw-600">{row.totalEmails}</td>
                             <td>
-                              <div className="d-flex gap-1 flex-wrap">
-                                {row.hasAccessToken && (
-                                  <span className="badge bg-warning-subtle text-warning" title={row.tokenCreatedAt ? `Dibuat ${formatDateTime(row.tokenCreatedAt)}` : ''}>••••{row.tokenLast4 || ''}</span>
-                                )}
-                                {!row.hasAccessToken && (
-                                  <span className="badge bg-secondary-subtle text-secondary">-</span>
-                                )}
+                              <div className="admin-token-counts">
+                                <span className="badge bg-secondary-subtle text-secondary">{row.tokenCount} total</span>
+                                {row.availableTokenCount > 0 && <span className="badge bg-success-subtle text-success">{row.availableTokenCount} tersedia</span>}
+                                {row.waitingTokenCount > 0 && <span className="badge bg-warning-subtle text-warning">{row.waitingTokenCount} menunggu</span>}
+                                {row.fulfilledTokenCount > 0 && <span className="badge bg-primary-subtle text-primary">{row.fulfilledTokenCount} terpenuhi</span>}
                               </div>
                             </td>
                             <td><span className={`badge ${row.active ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'}`}>{row.active ? 'Aktif' : 'Arsip'}</span></td>
                             <td>
                               <div className="admin-row-actions">
-                                <button className="btn btn-sm btn-icon btn-outline-secondary" title="Rotasi token" onClick={() => rotateAliasToken(row.address)} disabled={loading}><i className="bi bi-arrow-repeat" /></button>
+                                <button className="btn btn-sm btn-outline-primary text-nowrap" title="Kelola token" onClick={() => setTokenManagerAlias(row.address)} disabled={loading}><i className="bi bi-key me-1" />Kelola token</button>
                                 <button className="btn btn-sm btn-icon btn-outline-success" title="Inbox" onClick={() => { setInboxAlias(row.address); setSection('inbox'); }}><i className="bi bi-inbox" /></button>
                                 <button className="btn btn-sm btn-icon btn-outline-danger" title="Arsipkan" onClick={() => removeAlias(row.address)} disabled={loading}><i className="bi bi-archive" /></button>
                               </div>
@@ -1253,6 +1263,16 @@ export default function AdminPage() {
       </section>
 
       <AdminMessageModal detail={inboxDetail} onClose={() => setInboxDetail(null)} />
+      {tokenManagerAlias && (
+        <AdminTokenManager
+          address={tokenManagerAlias}
+          onClose={() => setTokenManagerAlias('')}
+          onCreate={createAliasToken}
+          onLoad={loadAliasTokens}
+          onRevoke={revokeAliasToken}
+          onToast={setToast}
+        />
+      )}
 
       {toast && (
         <div className="admin-toast">

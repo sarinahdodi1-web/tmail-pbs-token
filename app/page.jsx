@@ -73,6 +73,7 @@ export default function HomePage() {
   useBootstrap();
   const [address, setAddress] = useState('');
   const [accessStatus, setAccessStatus] = useState('checking');
+  const [tokenStatus, setTokenStatus] = useState('waiting');
   const [accessToken, setAccessToken] = useState('');
   const [accessLoading, setAccessLoading] = useState(false);
   const [accessError, setAccessError] = useState('');
@@ -99,6 +100,7 @@ export default function HomePage() {
 
   function returnToGate(message = '') {
     setAccessStatus('gate');
+    setTokenStatus('waiting');
     setAddress('');
     setMessages([]);
     setDetail(null);
@@ -127,6 +129,7 @@ export default function HomePage() {
       if (!resolvedAddress) throw new Error('Alias tidak ditemukan untuk token ini');
       setAccessToken('');
       setAddress(resolvedAddress);
+      setTokenStatus(data.status === 'fulfilled' ? 'fulfilled' : 'waiting');
       setAccessStatus('unlocked');
     } catch (err) {
       setAccessError(err?.message || 'Gagal membuka inbox');
@@ -149,12 +152,13 @@ export default function HomePage() {
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) return null;
-        return getContextAddress(data);
+        return { address: getContextAddress(data), status: data.status };
       })
-      .then((resolvedAddress) => {
+      .then((session) => {
         if (!active) return;
-        if (resolvedAddress) {
-          setAddress(resolvedAddress);
+        if (session?.address) {
+          setAddress(session.address);
+          setTokenStatus(session.status === 'fulfilled' ? 'fulfilled' : 'waiting');
           setAccessStatus('unlocked');
         } else {
           setAccessStatus('gate');
@@ -473,6 +477,15 @@ export default function HomePage() {
       if (!res.ok) throw new Error(data?.error || 'Failed to fetch messages');
 
       const newMessages = data.messages || [];
+      if (newMessages.length > 0) {
+        setTokenStatus('fulfilled');
+      } else {
+        const accessRes = await fetch('/api/access', { cache: 'no-store' });
+        if (accessRes.ok) {
+          const accessData = await accessRes.json().catch(() => ({}));
+          setTokenStatus(accessData.status === 'fulfilled' ? 'fulfilled' : 'waiting');
+        }
+      }
 
       // On first fetch after alias change (non-silent), just populate prevIds without notifying
       if (!silent) {
@@ -703,7 +716,7 @@ export default function HomePage() {
                     <i className="bi bi-shield-lock-fill" />
                   </div>
                   <h2 style={{ color: t.textPrimary, fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.4rem' }}>Buka inbox Anda</h2>
-                  <p style={{ color: t.textMuted, fontSize: '0.88rem', marginBottom: '1.25rem' }}>Token tidak disimpan di browser atau ditambahkan ke URL.</p>
+                  <p style={{ color: t.textMuted, fontSize: '0.88rem', marginBottom: '1.25rem' }}>Setiap token hanya dapat dipakai sekali dan mencadangkan satu email masuk. Sesi tetap aktif setelah token ditukar.</p>
                   <label htmlFor="access-token" style={{ display: 'block', color: t.textPrimary, fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.45rem' }}>TOKEN AKSES</label>
                   <div className="access-form-row">
                     <input
@@ -727,7 +740,7 @@ export default function HomePage() {
               {accessStatus === 'unlocked' && (
                 <div className="unlocked-address-row">
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: t.textMuted, marginBottom: '0.35rem' }}>Inbox aktif</p>
+                    <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: t.textMuted, marginBottom: '0.35rem' }}>{tokenStatus === 'fulfilled' ? 'Email diterima' : 'Menunggu 1 email'}</p>
                     <div style={{ color: t.textPrimary, fontWeight: 700, overflowWrap: 'anywhere' }}><i className="bi bi-envelope-check-fill me-2" style={{ color: t.primary }} />{address}</div>
                   </div>
                   <button type="button" style={btnOutline} onClick={changeToken}><i className="bi bi-arrow-left-right" />Ganti token</button>
@@ -803,7 +816,7 @@ export default function HomePage() {
                       <i className="bi bi-inbox" style={{ fontSize: '1.5rem', color: t.textMuted }} />
                     </div>
                     <p style={{ color: t.textPrimary, fontWeight: 600, marginBottom: '0.25rem', fontSize: '0.9rem' }}>
-                      Menunggu email masuk...
+                      Menunggu 1 email
                     </p>
                     <p style={{ color: t.textMuted, fontSize: '0.8rem', marginBottom: 0 }}>
                       Refresh otomatis setiap {AUTO_REFRESH_MS / 1000} detik
@@ -888,7 +901,7 @@ export default function HomePage() {
             }
 
             {accessStatus === 'unlocked' && <p style={{ textAlign: 'center', marginTop: '1.25rem', color: t.textMuted, fontSize: '0.78rem', marginBottom: 0 }}>
-              Auto-refresh setiap {AUTO_REFRESH_MS / 1000} detik &bull; Maks 3 pesan terbaru
+              Satu token hanya berlaku untuk satu email &bull; Sesi ini tetap aktif setelah email diterima
             </p>}
           </div>
         </div>

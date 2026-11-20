@@ -7,7 +7,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(request, { params }) {
   try {
     const session = await requireAccessSession(request);
-    const payload = await getMessageDetail(params.id, { alias: session.alias });
+    const payload = await getMessageDetail(params.id, {
+      alias: session.alias,
+      tokenId: session.tokenId
+    });
     return respond(payload, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
     const response = handleError(err);

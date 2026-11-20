@@ -19,7 +19,7 @@ export default function AdminAliasCreateForm({
           <i className="bi bi-key-fill mt-1" />
           <div>
             <strong>Token akses dibuat otomatis.</strong>
-            <div className="small mt-1">Server akan menampilkan token satu kali setelah alias dibuat. Simpan token sebelum menutup halaman.</div>
+            <div className="small mt-1">Token awal langsung ditampilkan dan tetap dapat dibuka atau disalin kembali melalui menu Kelola token.</div>
           </div>
         </div>
 
