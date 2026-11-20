@@ -274,7 +274,7 @@ Yang ditambahkan adalah domain email alias, bukan domain aplikasi Vercel.
 
 Buat alias dari menu Alias di dashboard admin. Server otomatis membuat token awal. Token dapat dibuka dan disalin kembali melalui aksi **Kelola token**, dan admin dapat membuat beberapa token untuk alias yang sama.
 
-Setiap token hanya dapat ditukar satu kali. Setelah ditukar, token masuk antrean `waiting`; email berikutnya dialokasikan ke token menunggu paling lama (FIFO). Tepat satu email dialokasikan ke setiap token. Email yang datang saat tidak ada token `waiting` diabaikan oleh inbox akses publik.
+Setiap token hanya dapat ditukar satu kali. Setelah ditukar, token masuk antrean `waiting`; email berikutnya dialokasikan ke token menunggu paling lama (FIFO). Tepat satu email dialokasikan ke setiap token. Semua email tetap disimpan untuk inbox admin; email tanpa token `waiting` tidak ditampilkan pada inbox publik.
 
 Kirim email ke alias yang baru dibuat:
 

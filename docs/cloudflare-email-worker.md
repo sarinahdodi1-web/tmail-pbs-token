@@ -191,7 +191,7 @@ GET /api/admin/messages/:id
 
 Jika `app_messages` belum tersedia, aplikasi masih fallback ke Gmail API. Jika tabel sudah tersedia tetapi alias belum punya email, API mengembalikan inbox kosong tanpa memanggil Gmail.
 
-Setiap alias dapat memiliki beberapa token. Token hanya dapat ditukar satu kali, lalu berubah menjadi `waiting`. Email dialokasikan ke token `waiting` paling lama (FIFO), tepat satu pesan untuk setiap token, lalu token menjadi `fulfilled`. Endpoint publik mengembalikan daftar kosong selama menunggu dan hanya pesan yang dialokasikan setelah terpenuhi. Pesan yang masuk ketika tidak ada token `waiting` tidak dialokasikan dan diabaikan oleh inbox akses publik.
+Setiap alias dapat memiliki beberapa token. Token hanya dapat ditukar satu kali, lalu berubah menjadi `waiting`. Email dialokasikan ke token `waiting` paling lama (FIFO), tepat satu pesan untuk setiap token, lalu token menjadi `fulfilled`. Semua email tetap disimpan dan dapat dilihat admin; endpoint publik mengembalikan daftar kosong selama menunggu dan hanya pesan yang dialokasikan ke token tersebut setelah terpenuhi. Pesan tanpa token `waiting` tidak dialokasikan ke user.
 
 Jika `BACKUP_EMAIL` Worker diisi, salinan email juga dapat diteruskan ke Gmail.
 
